@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道路病害识别系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 30px;
+        }
+        
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+        }
+        
+        .upload-area.dragover {
+            background: #f0f2ff;
+            border-color: #5a67d8;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .preview {
+            max-width: 600px;
+            margin: 20px auto;
+            text-align: center;
+        }
+        
+        .preview img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .damage-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .damage-type {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .damage-info {
+            color: #666;
+            line-height: 1.8;
+        }
+        
+        .severity {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .severity.轻微 { background: #d4edda; color: #155724; }
+        .severity.中等 { background: #fff3cd; color: #856404; }
+        .severity.严重 { background: #f8d7da; color: #721c24; }
+        .severity.危险 { background: #dc3545; color: white; }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛣️ 道路病害智能识别系统</h1>
+        <p class="subtitle">基于 AI 的道路病害自动检测与分析</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <input type="file" id="fileInput" accept="image/*">
+            <div>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <h3 style="margin: 15px 0; color: #667eea;">上传道路照片</h3>
+                <p style="color: #999;">点击或拖拽图片到此处</p>
+            </div>
+        </div>
+        
+        <div class="preview" id="preview" style="display: none;">
+            <img id="previewImg" src="" alt="预览">
+            <br><br>
+            <button class="btn" id="detectBtn">开始识别</button>
+        </div>
+        
+        <div class="loading" id="loading" style="display: none;">
+            🔄 正在识别中，请稍候...
+        </div>
+        
+        <div class="error" id="error" style="display: none;"></div>
+        
+        <div class="result" id="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const previewImg = document.getElementById('previewImg');
+        const detectBtn = document.getElementById('detectBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const result = document.getElementById('result');
+        
+        let selectedFile = null;
+        
+        // 点击上传
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        // 选择文件
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+        
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+        
+        // 处理文件
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                showError('请选择图片文件');
+                return;
+            }
+            
+            selectedFile = file;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                preview.style.display = 'block';
+                result.style.display = 'none';
+                error.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // 开始识别
+        detectBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            error.style.display = 'none';
+            detectBtn.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            try {
+                const response = await fetch(`${API_BASE}/detect`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('识别失败');
+                }
+                
+                const data = await response.json();
+                displayResult(data);
+            } catch (err) {
+                showError('识别失败: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
+                detectBtn.disabled = false;
+            }
+        });
+        
+        // 显示结果
+        function displayResult(data) {
+            let html = `
+                <h3>识别结果</h3>
+                <p><strong>检测ID:</strong> ${data.id}</p>
+                <p><strong>风险等级:</strong> <span class="severity ${data.risk_level}">${data.risk_level}</span></p>
+                <p><strong>检测到 ${data.damages.length} 处病害:</strong></p>
+            `;
+            
+            data.damages.forEach((damage, i) => {
+                html += `
+                    <div class="damage-item">
+                        <div class="damage-type">
+                            ${i + 1}. ${damage.type}
+                            <span class="severity ${damage.severity}">${damage.severity}</span>
+                        </div>
+                        <div class="damage-info">
+                            📍 位置: ${damage.location}<br>
+                            📏 尺寸: ${damage.size}<br>
+                            🎯 置信度: ${(damage.confidence * 100).toFixed(1)}%<br>
+                            💡 建议: ${damage.suggestAction}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            result.innerHTML = html;
+            result.style.display = 'block';
+        }
+        
+        // 显示错误
+        function showError(message) {
+            error.textContent = '❌ ' + message;
+            error.style.display = 'block';
+            setTimeout(() => {
+                error.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
